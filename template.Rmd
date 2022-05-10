@@ -4,6 +4,10 @@ output: pdf_document
 ---
 
 ```{r}
+library(tidyverse)
+```
 
+```{r}
+IBM_df = read.csv("IBM.csv")
 ```
 
