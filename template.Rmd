@@ -8,7 +8,12 @@ library(tidyverse)
 library(caret)
 library(corrplot)
 library(AppliedPredictiveModeling)
+library(pROC)
+library(rpart.plot)
 
+ctrl1 <- trainControl(method = "cv",
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
 knitr::opts_chunk$set(
   fig.width = 6,
   fig.asp = .6,
@@ -99,9 +104,190 @@ plt_feature <-
 update(plt_feature, main = "Density Plot Matrix")
 ```
 
-## glm 
+## Logistic regression 
 
 ```{r}
+# Fit a logistic regression model
+set.seed(2022)
+model.glm <- train(x = x_train,
+                   y = y_train,
+                   method = "glm",
+                   metric = "ROC",
+                   trControl = ctrl1)
 
+## test auc and misclassification error rate
+pred_glm_auc <- predict(model.glm, newdata = x_test, type = "prob")[,2]
+roc(y_test, pred_glm_auc)$auc[1]
+
+pred_glm <- predict(model.glm, newdata = x_test)
+pred.miserror_glm <- 1 - mean(pred_glm == y_test)
+pred.miserror_glm
 ```
 
+## MARS
+
+```{r message=FALSE, warning=FALSE}
+set.seed(2022)
+model.mars <- train(x = x_train,
+                    y = y_train,
+                    method = "earth",
+                    tuneGrid = expand.grid(degree = 1:4,
+                                           nprune = 5:25),
+                    metric = "ROC",
+                    trControl = ctrl1)
+
+model.mars$bestTune
+ggplot(model.mars, highlight = T) + 
+  theme_bw()
+
+## test auc and misclassification error rate
+pred_mars_auc <- predict(model.mars, newdata = x_test, type = "prob")[,2]
+roc(y_test, pred_mars_auc)$auc[1]
+
+pred_mars <- predict(model.mars, newdata = x_test)
+pred.miserror_mars <- 1 - mean(pred_mars == y_test)
+pred.miserror_mars
+```
+
+## LDA
+
+```{r}
+set.seed(2022)
+model.lda <- train(x = x_train,
+                   y = y_train,
+                   method = "lda",
+                   metric = "ROC",
+                   trControl = ctrl1)
+
+## test auc and misclassification error rate
+pred_lda_auc <- predict(model.lda, newdata = x_test, type = "prob")[,2]
+roc(y_test, pred_lda_auc)$auc[1]
+
+pred_lda <- predict(model.lda, newdata = x_test)
+pred.miserror_lda <- 1 - mean(pred_lda == y_test)
+pred.miserror_lda
+```
+
+## Classification Tree
+
+```{r message=FALSE, warning=FALSE}
+set.seed(2022)
+model.tree <- train(x_train,
+                    y_train,
+                    method = "rpart",
+                    tuneGrid = data.frame(cp = exp(seq(-7, -5, length = 30))),
+                    trControl = ctrl1,
+                    metric = "ROC")
+
+ggplot(model.tree, highlight = TRUE) +
+  scale_x_continuous(trans = scales::log_trans(),
+                     breaks = scales::log_breaks()) + 
+  theme_bw()
+
+rpart.plot(model.tree$finalModel)
+
+## test auc and misclassification error rate
+pred_tree_auc <- predict(model.tree, newdata = x_test, type = "prob")[,2]
+roc(y_test, pred_tree_auc)$auc[1]
+
+pred_tree <- predict(model.tree, newdata = x_test)
+pred.miserror_tree <- 1 - mean(pred_tree == y_test)
+pred.miserror_tree
+```
+
+## Ramdom forests
+
+```{r}
+set.seed(2022)
+model.rf = train(x_train,
+                 y_train,
+                 method = "ranger",
+                 tuneGrid = expand.grid(mtry = 1:8,
+                                        splitrule = "gini",
+                                        min.node.size = seq(4, 16, by = 2)),
+                 metric = "ROC",
+                 trControl = ctrl1)
+
+model.rf$bestTune
+ggplot(model.rf, highlight = T) + 
+  theme_bw()
+
+## test auc and misclassification error rate
+pred_rf_auc <- predict(model.rf, newdata = x_test, type = "prob")[,2]
+roc(y_test, pred_rf_auc)$auc[1]
+
+pred_rf <- predict(model.rf, newdata = x_test)
+pred.miserror_rf <- 1 - mean(pred_rf == y_test)
+pred.miserror_rf
+```
+
+## Adaboost
+
+```{r}
+set.seed(2022)
+model.boost = train(x_train,
+                    y_train,
+                    method = "gbm",
+                    tuneGrid = expand.grid(n.trees = c(2000, 3000, 4000, 5000),
+                                           interaction.depth = 1:6,
+                                           shrinkage = c(0.0005, 0.001, 0.002),
+                                           n.minobsinnode = 1),
+                    distribution = "adaboost",
+                    metric = "ROC",
+                    verbose = FALSE,
+                    trControl = ctrl1)
+
+ggplot(model.boost, highlight = T) + 
+  theme_bw()
+```
+
+## Fit a support vector classifier (linear kernel)
+```{r message=FALSE, warning=FALSE}
+set.seed(2022)
+model.svml = train(x_train,
+                   y_train,
+                   method = "svmLinear",
+                   metric = "ROC",
+                   tuneGrid = data.frame(C = exp(seq(-4, 3, length = 50))),
+                   trControl = ctrl1)
+
+ggplot(model.svml, highlight = TRUE) +
+  scale_x_continuous(trans = scales::log_trans(),
+                     breaks = scales::log_breaks()) + 
+  theme_bw()
+
+## test auc and misclassification error rate
+pred_svml_auc <- predict(model.svml, newdata = x_test, type = "prob")[,2]
+roc(y_test, pred_svml_auc)$auc[1]
+
+pred_svml <- predict(model.svml, newdata = x_test)
+pred.miserror_svml <- 1 - mean(pred_svml == y_test)
+pred.miserror_svml
+```
+
+## Fit a support vector machine with a radial kernel
+
+```{r}
+set.seed(2022)
+model.svmr = train(x_train,
+                 y_train,
+                 method = "svmRadialSigma",
+                 metric = "ROC",
+                 tuneGrid = expand.grid(C = exp(seq(-1, 3, length = 20)),
+                                       sigma = exp(seq(-7, -3, length = 20))),
+                 trControl = ctrl1)
+
+model.svmr$bestTune
+myCol<- rainbow(20)
+myPar <- list(superpose.symbol = list(col = myCol),
+superpose.line = list(col = myCol))
+plot(model.svmr, highlight = TRUE, par.settings = myPar)
+
+## test auc and misclassification error rate
+pred_svmr_auc <- predict(model.svmr, newdata = x_test, type = "prob")[,2]
+roc(y_test, pred_svmr_auc)$auc[1]
+
+pred_svmr <- predict(model.svmr, newdata = x_test)
+pred.miserror_svmr <- 1 - mean(pred_svmr == y_test)
+pred.miserror_svmr
+```
