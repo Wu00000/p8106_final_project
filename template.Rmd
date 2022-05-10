@@ -53,10 +53,24 @@ y_test <- IBM_test$Attrition
 
 ## Exploratory
 
-```{r}
+```{r, fig.height=8, fig.width=8}
+corrplot(cor(x_train),
+         method = "circle", 
+         type = "upper", 
+         tl.col = "black",
+         tl.cex = 1.2,
+         tl.srt = 70)
 
+# Boxplot matrix for categorical variables
+IBM_train %>% 
+  select(2, 3, 5:9, 12) %>% 
+  pivot_longer(-2,
+               names_to = "Variable",
+               values_to = "Value") %>% 
+  ggplot(aes(x = Variable, y = Value)) +
+  geom_boxplot(aes(alpha = .5, fill = ))
+  
 ```
-
 
 ## glm 
 
