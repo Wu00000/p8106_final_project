@@ -5,9 +5,62 @@ output: pdf_document
 
 ```{r}
 library(tidyverse)
+library(caret)
+library(corrplot)
 ```
 
+## Pre-process
+
 ```{r}
-IBM_df = read.csv("IBM.csv")
+## Input
+IBM_df = read.csv("IBM.csv") %>% 
+  mutate(Education = recode(Education,
+                            "1" = "Below College",
+                            "2" = "College",
+                            "3" = "Bachelor",
+                            "4" = "Master",
+                            "5" = "Doctor"),
+         WorkLifeBalance = recode(WorkLifeBalance,
+                                  "1" = "Bad",
+                                  "2" = "Good",
+                                  "3" = "Better",
+                                  "4" = "Best"),
+         EnvironmentSatisfaction = recode(EnvironmentSatisfaction,
+                                          "1" = "Low",
+                                          "2" = "Medium",
+                                          "3" = "High",
+                                          "4" = "Very High"),
+         JobSatisfaction = recode(JobSatisfaction,
+                                  "1" = "Low",
+                                  "2" = "Medium",
+                                  "3" = "High",
+                                  "4" = "Very High"))
+
+## Partition 
+set.seed(2022)
+trRow <- createDataPartition(IBM_df$Attrition, p = 0.8, list = F)
+
+## Train data
+IBM_train <- IBM_df[trRow, ]
+x_train <- model.matrix(Attrition ~., IBM_train)[,-1]
+y_train <- IBM_train$Attrition
+
+## Test data
+IBM_test <- IBM_df[-trRow, ]
+x_test <- model.matrix(Attrition ~., IBM_test)[,-1]
+y_test <- IBM_test$Attrition
+```
+
+## Exploratory
+
+```{r}
+
+```
+
+
+## glm 
+
+```{r}
+
 ```
 
