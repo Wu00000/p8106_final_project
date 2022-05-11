@@ -28,7 +28,7 @@ knitr::opts_chunk$set(
 ## Data pre-process
 ```{r}
 # Import data
-dat_raw <- read.csv("./dat1.csv") 
+dat_raw <- read.csv("./airline.csv") 
 
 # Check missing value
 sapply(dat_raw, function(x) sum(is.na(x)))
@@ -68,7 +68,7 @@ y_test <- test$satisfaction
 
 
 ## EDA
-```{r, fig.height = 6, fig.width = 6}
+```{r, fig.height = 8, fig.width = 8}
 # Correlation plot
 corrplot(cor(x_train),
          method = "circle", 
@@ -120,7 +120,6 @@ model.glm <- train(x = x_train,
                    metric = "ROC",
                    trControl = ctrl)
 
-
 # Test AUC and Misclassification error rate
 pred_glm_auc <- predict(model.glm, newdata = x_test, type = "prob")[,2]
 roc(y_test, pred_glm_auc)$auc[1]
@@ -155,14 +154,15 @@ pred_mars <- predict(model.mars, newdata = x_test)
 pred.miserror_mars <- 1 - mean(pred_mars == y_test)
 pred.miserror_mars
 
+
 confusionMatrix(data = as.factor(pred_mars),
                 reference = as.factor(y_test))
 ```
 
-## LDA
 
+## LDA
 ```{r}
-set.seed(2022)
+set.seed(1234)
 model.lda <- train(x = x_train,
                    y = y_train,
                    method = "lda",
@@ -181,7 +181,7 @@ pred.miserror_lda
 ## Classification Tree
 
 ```{r message=FALSE, warning=FALSE}
-set.seed(2022)
+set.seed(1234)
 model.tree <- train(x_train,
                     y_train,
                     method = "rpart",
@@ -208,7 +208,7 @@ pred.miserror_tree
 ## Ramdom forests
 
 ```{r}
-set.seed(2022)
+set.seed(1234)
 model.rf = train(x_train,
                  y_train,
                  method = "ranger",
@@ -231,25 +231,6 @@ pred.miserror_rf <- 1 - mean(pred_rf == y_test)
 pred.miserror_rf
 ```
 
-## Adaboost
-
-```{r}
-set.seed(2022)
-model.boost = train(x_train,
-                    y_train,
-                    method = "gbm",
-                    tuneGrid = expand.grid(n.trees = c(2000, 3000, 4000, 5000),
-                                           interaction.depth = 1:6,
-                                           shrinkage = c(0.0005, 0.001, 0.002),
-                                           n.minobsinnode = 1),
-                    distribution = "adaboost",
-                    metric = "ROC",
-                    verbose = FALSE,
-                    trControl = ctrl1)
-
-ggplot(model.boost, highlight = T) + 
-  theme_bw()
-```
 
 ## Fit a support vector classifier (linear kernel)
 ```{r message=FALSE, warning=FALSE}
@@ -274,6 +255,7 @@ pred_svml <- predict(model.svml, newdata = x_test)
 pred.miserror_svml <- 1 - mean(pred_svml == y_test)
 pred.miserror_svml
 ```
+
 
 ## Fit a support vector machine with a radial kernel
 
