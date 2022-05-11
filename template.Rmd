@@ -11,7 +11,9 @@ library(corrplot)
 library(AppliedPredictiveModeling)
 library(pROC)
 library(rpart.plot)
-
+library(vip)
+library(ranger)
+library(tidytext)
 
 ctrl <- trainControl(method = "cv",
                      summaryFunction = twoClassSummary,
@@ -41,15 +43,17 @@ dat <- dat_raw %>%
                           "satisfied" = "yes",
                           "neutral or dissatisfied" = "no"))
 
+
 # deal with missing values
 deal_mis <- dat[, 21:22]
-vis_miss(deal_mis)
 bagImp = preProcess(deal_mis, method = "bagImpute")
 dat = predict(bagImp, dat)
+vis_miss(deal_mis)
 
 # sample data
 set.seed(1234)
 dat <- dat[sample(1:nrow(dat), 2000, replace = FALSE), ]
+vis_miss(dat) ## check
 
 # --- Split data ---
 set.seed(1234)
@@ -68,39 +72,45 @@ y_test <- test$satisfaction
 
 
 ## EDA
-```{r, fig.height = 8, fig.width = 8}
+```{r, fig.height = 6, fig.width = 6}
 # Correlation plot
 corrplot(cor(x_train),
          method = "circle", 
-         type = "upper", 
+         type = "upper",
          tl.col = "black",
-         tl.cex = 1.2,
-         tl.srt = 50)
+         tl.cex = 1.2)
 ```
 
 ```{r, fig.height=4, fig.width=4}
 # Barplot matrix for categorical variables
-nba_train %>% 
-  select(2, 3, 5:9, 12) %>% 
-  pivot_longer(-1,
-               names_to = "Variable",
-               values_to = "Value") %>% 
-  group_by(Variable, Value, Attrition) %>% 
+train %>% 
+  select(1:2, 4:5, 23) %>% 
+  pivot_longer(-5,
+               names_to = "variable",
+               values_to = "value") %>% 
+  group_by(variable, value, satisfaction) %>% 
   summarize(num = n()) %>% 
   ungroup() %>% 
-  group_by(Variable, Attrition) %>% 
-  mutate(percent = num / sum(num)) %>% 
-  ggplot(aes(x = Value, y = percent, fill = Attrition)) +
+  group_by(variable, satisfaction) %>% 
+  mutate(percent = num / sum(num),
+         indicator = case_when(value == "Eco" ~ 3,
+                               value == "Eco Plus" ~ 2,
+                               value == "Business" ~ 1,
+                               TRUE ~ 0)) %>% 
+  ggplot(aes(x = reorder_within(value, indicator, variable),
+             y = percent, fill = satisfaction)) +
   geom_col(position = "dodge") + 
+  xlab("Barplot matrix for categorical variables") +
   coord_flip() +
-  facet_wrap(~ Variable, scales = "free") + theme_bw()
+  scale_x_reordered() +
+  facet_wrap(~ variable, scales = "free") + theme_bw()
 
 # Density plot matrix
 theme1 <- transparentTheme(trans = .5)
 trellis.par.set(theme1)
 
 plt_feature <- 
-  featurePlot(x = x_train[, c(1, 4, 22, 23, 27)],
+  featurePlot(x = x_train[ , c(-1, -2, -4, -5, -6)],
               y = as.factor(y_train),
               plot = "density",
               scales = list(x = list(relation = "free"),
@@ -108,7 +118,6 @@ plt_feature <-
               pch = "|", auto.key = list(columns = 2))
 update(plt_feature, main = "Density Plot Matrix")
 ```
-
 
 # Model fitting
 ## Logistic regression
@@ -137,8 +146,8 @@ set.seed(1234)
 model.mars <- train(x = x_train,
                     y = y_train,
                     method = "earth",
-                    tuneGrid = expand.grid(degree = 1:3,
-                                           nprune = 5:20),
+                    tuneGrid = expand.grid(degree = 1:4,
+                                           nprune = 5:22),
                     metric = "ROC",
                     trControl = ctrl)
 
@@ -167,7 +176,7 @@ model.lda <- train(x = x_train,
                    y = y_train,
                    method = "lda",
                    metric = "ROC",
-                   trControl = ctrl1)
+                   trControl = ctrl)
 
 ## test auc and misclassification error rate
 pred_lda_auc <- predict(model.lda, newdata = x_test, type = "prob")[,2]
@@ -176,6 +185,9 @@ roc(y_test, pred_lda_auc)$auc[1]
 pred_lda <- predict(model.lda, newdata = x_test)
 pred.miserror_lda <- 1 - mean(pred_lda == y_test)
 pred.miserror_lda
+
+confusionMatrix(data = as.factor(pred_lda),
+                reference = as.factor(y_test))
 ```
 
 ## Classification Tree
@@ -185,10 +197,13 @@ set.seed(1234)
 model.tree <- train(x_train,
                     y_train,
                     method = "rpart",
-                    tuneGrid = data.frame(cp = exp(seq(-7, -5, length = 30))),
-                    trControl = ctrl1,
+                    tuneGrid = data.frame(cp = exp(seq(-10, -6, length = 30))),
+                    trControl = ctrl,
                     metric = "ROC")
 
+printcp(model.tree)
+
+model.tree$bestTune
 ggplot(model.tree, highlight = TRUE) +
   scale_x_continuous(trans = scales::log_trans(),
                      breaks = scales::log_breaks()) + 
@@ -203,6 +218,9 @@ roc(y_test, pred_tree_auc)$auc[1]
 pred_tree <- predict(model.tree, newdata = x_test)
 pred.miserror_tree <- 1 - mean(pred_tree == y_test)
 pred.miserror_tree
+
+confusionMatrix(data = as.factor(pred_tree),
+                reference = as.factor(y_test))
 ```
 
 ## Ramdom forests
@@ -212,11 +230,11 @@ set.seed(1234)
 model.rf = train(x_train,
                  y_train,
                  method = "ranger",
-                 tuneGrid = expand.grid(mtry = 1:8,
+                 tuneGrid = expand.grid(mtry = 3:14,
                                         splitrule = "gini",
-                                        min.node.size = seq(4, 16, by = 2)),
+                                        min.node.size = seq(4, 14, by = 2)),
                  metric = "ROC",
-                 trControl = ctrl1)
+                 trControl = ctrl)
 
 model.rf$bestTune
 ggplot(model.rf, highlight = T) + 
@@ -229,18 +247,21 @@ roc(y_test, pred_rf_auc)$auc[1]
 pred_rf <- predict(model.rf, newdata = x_test)
 pred.miserror_rf <- 1 - mean(pred_rf == y_test)
 pred.miserror_rf
+
+confusionMatrix(data = as.factor(pred_rf),
+                reference = as.factor(y_test))
 ```
 
 
 ## Fit a support vector classifier (linear kernel)
 ```{r message=FALSE, warning=FALSE}
-set.seed(2022)
+set.seed(1234)
 model.svml = train(x_train,
                    y_train,
                    method = "svmLinear",
                    metric = "ROC",
-                   tuneGrid = data.frame(C = exp(seq(-4, 3, length = 50))),
-                   trControl = ctrl1)
+                   tuneGrid = data.frame(C = exp(seq(-5, 1, length = 30))),
+                   trControl = ctrl)
 
 ggplot(model.svml, highlight = TRUE) +
   scale_x_continuous(trans = scales::log_trans(),
@@ -254,20 +275,22 @@ roc(y_test, pred_svml_auc)$auc[1]
 pred_svml <- predict(model.svml, newdata = x_test)
 pred.miserror_svml <- 1 - mean(pred_svml == y_test)
 pred.miserror_svml
-```
 
+confusionMatrix(data = as.factor(pred_svml),
+                reference = as.factor(y_test))
+```
 
 ## Fit a support vector machine with a radial kernel
 
 ```{r}
-set.seed(2022)
+set.seed(1234)
 model.svmr = train(x_train,
                  y_train,
                  method = "svmRadialSigma",
                  metric = "ROC",
                  tuneGrid = expand.grid(C = exp(seq(-1, 3, length = 20)),
                                        sigma = exp(seq(-7, -3, length = 20))),
-                 trControl = ctrl1)
+                 trControl = ctrl)
 
 model.svmr$bestTune
 myCol<- rainbow(20)
@@ -282,4 +305,39 @@ roc(y_test, pred_svmr_auc)$auc[1]
 pred_svmr <- predict(model.svmr, newdata = x_test)
 pred.miserror_svmr <- 1 - mean(pred_svmr == y_test)
 pred.miserror_svmr
+
+confusionMatrix(data = as.factor(pred_svmr),
+                reference = as.factor(y_test))
 ```
+
+## Resample
+
+```{r}
+resamp <- resamples(list(glm = model.glm, mars = model.mars,
+                         lda = model.lda, cla_tree = model.tree,
+                         rf = model.rf, svml = model.svml,
+                         svmr = model.svmr))
+
+bwplot(resamp)
+```
+
+### Select the rf model and interpret
+
+```{r}
+set.seed(1234)
+rf2.final.per <- ranger(factor(satisfaction) ~ .,
+                        data = train,
+                        mtry = model.rf$bestTune[[1]],
+                        min.node.size = model.rf$bestTune[[3]],
+                        splitrule = "gini",
+                        importance = "permutation",
+                        scale.permutation.importance = TRUE)
+
+barplot(sort(ranger::importance(rf2.final.per), decreasing = FALSE),
+        las = 2,
+        horiz = TRUE,
+        cex.names = 0.7,
+        col = colorRampPalette(colors = c("cyan", "blue"))(8))
+```
+
+
