@@ -80,8 +80,7 @@ corrplot(cor(x_train),
          method = "circle", 
          type = "upper",
          tl.col = "black",
-         tl.cex = 1.2,
-         tl.srt = 70)
+         tl.cex = 0.4)
 ```
 
 ```{r}
