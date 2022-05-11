@@ -5,8 +5,8 @@ output: pdf_document
 
 ```{r setup}
 library(tidyverse)
-library(readxl)
 library(caret)
+library(visdat)
 library(corrplot)
 library(AppliedPredictiveModeling)
 library(pROC)
@@ -28,19 +28,26 @@ knitr::opts_chunk$set(
 ## Data pre-process
 ```{r}
 # Import data
-dat_raw <- read_csv("./dat1.csv") 
+dat_raw <- read.csv("./dat1.csv") 
 
 # Check missing value
 sapply(dat_raw, function(x) sum(is.na(x)))
 
+# data clean
 dat <- dat_raw %>% 
   janitor::clean_names() %>% 
-  select(-1, -2) %>% 
+  select(-1) %>% 
   mutate(satisfaction = recode(satisfaction,
                           "satisfied" = "yes",
-                          "neutral or dissatisfied" = "no"),
-         arrival_delay_in_minutes = replace(., is.na(.), NA))
+                          "neutral or dissatisfied" = "no"))
 
+# deal with missing values
+deal_mis <- dat[, 21:22]
+vis_miss(deal_mis)
+bagImp = preProcess(deal_mis, method = "bagImpute")
+dat = predict(bagImp, dat)
+
+# sample data
 set.seed(1234)
 dat <- dat[sample(1:nrow(dat), 2000, replace = FALSE), ]
 
