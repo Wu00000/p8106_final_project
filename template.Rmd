@@ -14,6 +14,8 @@ library(rpart.plot)
 library(vip)
 library(ranger)
 library(tidytext)
+library(pdp)
+library(lime)
 
 ctrl <- trainControl(method = "cv",
                      summaryFunction = twoClassSummary,
@@ -78,7 +80,8 @@ corrplot(cor(x_train),
          method = "circle", 
          type = "upper",
          tl.col = "black",
-         tl.cex = 1.2)
+         tl.cex = 1.2,
+         tl.srt = 70)
 ```
 
 ```{r, fig.height=4, fig.width=4}
@@ -201,8 +204,6 @@ model.tree <- train(x_train,
                     trControl = ctrl,
                     metric = "ROC")
 
-printcp(model.tree)
-
 model.tree$bestTune
 ggplot(model.tree, highlight = TRUE) +
   scale_x_continuous(trans = scales::log_trans(),
@@ -323,7 +324,8 @@ bwplot(resamp)
 
 ### Select the rf model and interpret
 
-```{r}
+```{r, fig.width=4}
+## importance variable
 set.seed(1234)
 rf2.final.per <- ranger(factor(satisfaction) ~ .,
                         data = train,
@@ -336,8 +338,44 @@ rf2.final.per <- ranger(factor(satisfaction) ~ .,
 barplot(sort(ranger::importance(rf2.final.per), decreasing = FALSE),
         las = 2,
         horiz = TRUE,
-        cex.names = 0.7,
+        cex.names = 0.4,
         col = colorRampPalette(colors = c("cyan", "blue"))(8))
 ```
+
+```{r}
+pdp1.rf <- model.rf %>% 
+  partial(pred.var = c("inflight_wifi_service")) %>% 
+  autoplot(train = train, rug = TRUE)
+
+pdp2.rf <- model.rf %>% 
+  partial(pred.var = c("inflight_wifi_service", "age"), chull = TRUE) %>% 
+  autoplot(train = train, rug = TRUE)
+
+grid.arrange(pdp1.rf, pdp2.rf, nrow = 1)
+```
+
+```{r}
+ice.rf <- model.rf %>% 
+  partial(pred.var = "inflight_wifi_service",
+           grid.resolution = 100,
+           ice = TRUE) %>% 
+  autoplot(train = dat, alpha = .1,
+           center = TRUE)
+
+ice.rf
+```
+
+```{r}
+##lime
+#explain.rf <- lime(data.frame(x_train), model.rf)
+
+#new_obs = x_train[1:10,]
+#explana.obs = explain(data.frame(new_obs),
+#                      explain.rf,
+#                      n_features = 10)
+
+#plot_features(explana.obs)
+```
+
 
 
