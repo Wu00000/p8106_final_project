@@ -35,7 +35,16 @@ knitr::opts_chunk$set(
 ## Data pre-process
 ```{r}
 # Import data
-dat_raw <- read.csv("airline.csv") 
+dat_raw <- read.csv("airline.csv")
+
+# find unique value of each column
+sapply(dat_raw, function(x) (length(unique(x))))
+
+# Check missing value
+sapply(dat, function(x) sum(is.na(x)))
+
+# Have a glance of the data
+skimr::skim_without_charts(dat)
 
 # data clean
 dat <- dat_raw %>% 
@@ -44,12 +53,6 @@ dat <- dat_raw %>%
   mutate(satisfaction = recode(satisfaction,
                           "satisfied" = "yes",
                           "neutral or dissatisfied" = "no"))
-
-# Have a glance of the data
-skimr::skim_without_charts(dat)
-
-# Check missing value
-sapply(dat, function(x) sum(is.na(x)))
 
 # deal with missing values
 deal_mis <- dat[, 21:22]
