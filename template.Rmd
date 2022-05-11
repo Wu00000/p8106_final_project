@@ -3,7 +3,7 @@ title: "Simple document"
 output: pdf_document
 ---
 
-```{r setup}
+```{r setup, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(caret)
 library(visdat)
@@ -23,16 +23,17 @@ ctrl <- trainControl(method = "cv",
 
 knitr::opts_chunk$set(
   fig.width = 6,
-  fig.asp = .6,
-  out.width = "90%"
-)
+  out.width = "75%",
+  fig.align = "center"
+  )
+
 ```
 
 
 ## Data pre-process
 ```{r}
 # Import data
-dat_raw <- read.csv("./airline.csv") 
+dat_raw <- read.csv("airline.csv") 
 
 # Check missing value
 sapply(dat_raw, function(x) sum(is.na(x)))
@@ -74,7 +75,7 @@ y_test <- test$satisfaction
 
 
 ## EDA
-```{r, fig.height = 6, fig.width = 6}
+```{r}
 # Correlation plot
 corrplot(cor(x_train),
          method = "circle", 
@@ -84,7 +85,7 @@ corrplot(cor(x_train),
          tl.srt = 70)
 ```
 
-```{r, fig.height=4, fig.width=4}
+```{r}
 # Barplot matrix for categorical variables
 train %>% 
   select(1:2, 4:5, 23) %>% 
