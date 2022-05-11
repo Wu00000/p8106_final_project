@@ -3,17 +3,20 @@ title: "Simple document"
 output: pdf_document
 ---
 
-```{r}
+```{r setup}
 library(tidyverse)
+library(readxl)
 library(caret)
 library(corrplot)
 library(AppliedPredictiveModeling)
 library(pROC)
 library(rpart.plot)
 
-ctrl1 <- trainControl(method = "cv",
+
+ctrl <- trainControl(method = "cv",
                      summaryFunction = twoClassSummary,
                      classProbs = TRUE)
+
 knitr::opts_chunk$set(
   fig.width = 6,
   fig.asp = .6,
@@ -21,36 +24,44 @@ knitr::opts_chunk$set(
 )
 ```
 
-## Pre-process
 
+## Data pre-process
 ```{r}
-## Input
-treat_df = read.csv("training_set.csv") %>%
-  select(-1,-2) %>% 
-  #mutate(across(.cols=1:16, .fns=as.numeric)) %>% 
-  mutate(SOURCE = recode(SOURCE,
-                          "1" = "yes",
-                          "0" = "no"),
-         SOURCE = as.factor(SOURCE)) 
+# Import data
+dat_raw <- read_csv("./dat1.csv") 
 
-## Partition 
-set.seed(2022)
-trRow <- createDataPartition(treat_df$SOURCE, p = 0.8, list = F)
+# Check missing value
+sapply(dat_raw, function(x) sum(is.na(x)))
 
-## Train data
-treat_train <- treat_df[trRow, ]
-x_train <- model.matrix(SOURCE ~., treat_train)[,-1]
-y_train <- treat_train$SOURCE
+dat <- dat_raw %>% 
+  janitor::clean_names() %>% 
+  select(-1, -2) %>% 
+  mutate(satisfaction = recode(satisfaction,
+                          "satisfied" = "yes",
+                          "neutral or dissatisfied" = "no"),
+         arrival_delay_in_minutes = replace(., is.na(.), NA))
 
-## Test data
-treat_test <- treat_df[-trRow, ]
-x_test <- model.matrix(SOURCE ~., treat_test)[,-1]
-y_test <- treat_test$SOURCE
+set.seed(1234)
+dat <- dat[sample(1:nrow(dat), 2000, replace = FALSE), ]
+
+# --- Split data ---
+set.seed(1234)
+trRow <- createDataPartition(dat$satisfaction, p = 0.8, list = F)
+
+# Train data
+train <- dat[trRow, ]
+x_train <- model.matrix(satisfaction ~., train)[,-1]
+y_train <- train$satisfaction
+
+# Test data
+test <- dat[-trRow, ]
+x_test <- model.matrix(satisfaction ~., test)[,-1]
+y_test <- test$satisfaction
 ```
 
-## Exploratory
 
-```{r, fig.height=6, fig.width=6}
+## EDA
+```{r, fig.height = 6, fig.width = 6}
 # Correlation plot
 corrplot(cor(x_train),
          method = "circle", 
@@ -91,51 +102,39 @@ plt_feature <-
 update(plt_feature, main = "Density Plot Matrix")
 ```
 
-## Logistic regression 
 
+# Model fitting
+## Logistic regression
 ```{r}
-# Fit a logistic regression model
-glmnGrid <- expand.grid(.alpha = seq(0, 1, length = 21),
-                       .lambda = exp(seq(-7, -3, length = 50)))
-
-set.seed(2022)
+set.seed(1234)
 model.glm <- train(x = x_train,
                    y = y_train,
-                   method = "glmnet",
+                   method = "glm",
                    metric = "ROC",
-                   tuneGrid = glmnGrid,
-                   trControl = ctrl1)
-
-myCol <- rainbow(25)
-myPar <- list(superpose.symbol = list(col = myCol),
-              superpose.line = list(col = myCol))
-
-plot(model.glm, par.settings = myPar, xTrans = function(x) log(x))
+                   trControl = ctrl)
 
 
-## test auc and misclassification error rate
+# Test AUC and Misclassification error rate
 pred_glm_auc <- predict(model.glm, newdata = x_test, type = "prob")[,2]
 roc(y_test, pred_glm_auc)$auc[1]
 
+# Confusion matrix
 pred_glm <- predict(model.glm, newdata = x_test)
-pred.miserror_glm <- 1 - mean(pred_glm == y_test)
-pred.miserror_glm
-
 confusionMatrix(data = as.factor(pred_glm),
                 reference = as.factor(y_test))
 ```
 
-## MARS
 
-```{r message=FALSE, warning=FALSE}
-set.seed(2022)
+## MARS
+```{r message = FALSE, warning = FALSE}
+set.seed(1234)
 model.mars <- train(x = x_train,
                     y = y_train,
                     method = "earth",
-                    tuneGrid = expand.grid(degree = 1:4,
-                                           nprune = 5:25),
+                    tuneGrid = expand.grid(degree = 1:3,
+                                           nprune = 5:20),
                     metric = "ROC",
-                    trControl = ctrl1)
+                    trControl = ctrl)
 
 model.mars$bestTune
 ggplot(model.mars, highlight = T) + 
@@ -148,6 +147,9 @@ roc(y_test, pred_mars_auc)$auc[1]
 pred_mars <- predict(model.mars, newdata = x_test)
 pred.miserror_mars <- 1 - mean(pred_mars == y_test)
 pred.miserror_mars
+
+confusionMatrix(data = as.factor(pred_mars),
+                reference = as.factor(y_test))
 ```
 
 ## LDA
