@@ -44,7 +44,7 @@ sapply(dat_raw, function(x) length(unique(x)))
 sapply(dat_raw, function(x) sum(is.na(x)))
 
 # Have a glance of the data
-skimr::skim_without_charts(dat)
+skimr::skim_without_charts(dat_raw)
 
 # data clean
 dat <- dat_raw %>% 
