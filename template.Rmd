@@ -35,9 +35,6 @@ knitr::opts_chunk$set(
 # Import data
 dat_raw <- read.csv("airline.csv") 
 
-# Check missing value
-sapply(dat_raw, function(x) sum(is.na(x)))
-
 # data clean
 dat <- dat_raw %>% 
   janitor::clean_names() %>% 
@@ -46,6 +43,8 @@ dat <- dat_raw %>%
                           "satisfied" = "yes",
                           "neutral or dissatisfied" = "no"))
 
+# Check missing value
+sapply(dat, function(x) sum(is.na(x)))
 
 # deal with missing values
 deal_mis <- dat[, 21:22]
