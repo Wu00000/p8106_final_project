@@ -41,7 +41,8 @@ dat <- dat_raw %>%
   select(-1) %>% 
   mutate(satisfaction = recode(satisfaction,
                           "satisfied" = "yes",
-                          "neutral or dissatisfied" = "no"))
+                          "neutral or dissatisfied" = "no")) %>% 
+  filter_at(vars(7:20), all_vars(. > 0.5))
 
 # Check missing value
 sapply(dat, function(x) sum(is.na(x)))
@@ -71,7 +72,6 @@ test <- dat[-trRow, ]
 x_test <- model.matrix(satisfaction ~., test)[,-1]
 y_test <- test$satisfaction
 ```
-
 
 ## EDA
 ```{r}
@@ -149,7 +149,7 @@ model.mars <- train(x = x_train,
                     y = y_train,
                     method = "earth",
                     tuneGrid = expand.grid(degree = 1:4,
-                                           nprune = 5:22),
+                                           nprune = 5:30),
                     metric = "ROC",
                     trControl = ctrl)
 
