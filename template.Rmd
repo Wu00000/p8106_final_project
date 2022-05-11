@@ -23,7 +23,7 @@ ctrl <- trainControl(method = "cv",
 
 knitr::opts_chunk$set(
   fig.width = 6,
-  out.width = "75%",
+  out.width = "80%",
   fig.align = "center"
   )
 
