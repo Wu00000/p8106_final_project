@@ -1,0 +1,132 @@
+---
+title: "Plots and tables"
+author: "Jialiang Hua"
+date: '2022-05-12'
+output: pdf_document
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(skimr)
+library(caret)
+library(visdat)
+library(corrplot)
+library(AppliedPredictiveModeling)
+library(pROC)
+library(rpart.plot)
+library(vip)
+library(ranger)
+library(tidytext)
+library(pdp)
+library(lime)
+
+
+ctrl <- trainControl(method = "cv",
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  out.width = "80%",
+  fig.align = "center"
+  )
+
+```
+
+
+## Data pre-process
+```{r}
+# Import data
+dat_raw <- read.csv("airline.csv")
+
+# find unique value of each column
+# sapply(dat_raw, function(x) length(unique(x)))
+
+# Check missing value
+# sapply(dat_raw, function(x) sum(is.na(x)))
+
+# Have a glance of the data
+skimr::skim_without_charts(dat_raw)
+
+# data clean
+dat <- dat_raw %>% 
+  janitor::clean_names() %>% 
+  select(-1) %>% 
+  mutate(satisfaction = recode(satisfaction,
+                          "satisfied" = "yes",
+                          "neutral or dissatisfied" = "no")) %>% 
+  filter_at(vars(7:20), all_vars(. > 0.5))
+
+# deal with missing values
+deal_mis <- dat[, 21:22]
+bagImp = preProcess(deal_mis, method = "bagImpute")
+dat = predict(bagImp, dat)
+vis_miss(deal_mis)
+
+# sample data
+set.seed(1234)
+dat <- dat[sample(1:nrow(dat), 2000, replace = FALSE), ]
+vis_miss(dat) ## check
+
+# --- Split data ---
+set.seed(1234)
+trRow <- createDataPartition(dat$satisfaction, p = 0.8, list = F)
+
+# Train data
+train <- dat[trRow, ]
+x_train <- model.matrix(satisfaction ~., train)[,-1]
+y_train <- train$satisfaction
+
+# Test data
+test <- dat[-trRow, ]
+x_test <- model.matrix(satisfaction ~., test)[,-1]
+y_test <- test$satisfaction
+```
+
+## EDA
+```{r}
+# Correlation plot
+corrplot(cor(x_train),
+         method = "circle", 
+         type = "upper",
+         tl.col = "black",
+         tl.cex = 0.5)
+```
+
+```{r}
+# Barplot matrix for categorical variables
+train %>% 
+  select(1:2, 4:5, 23) %>% 
+  pivot_longer(-5,
+               names_to = "variable",
+               values_to = "value") %>% 
+  group_by(variable, value, satisfaction) %>% 
+  summarize(num = n()) %>% 
+  ungroup() %>% 
+  group_by(variable, satisfaction) %>% 
+  mutate(percent = num / sum(num),
+         indicator = case_when(value == "Eco" ~ 3,
+                               value == "Eco Plus" ~ 2,
+                               value == "Business" ~ 1,
+                               TRUE ~ 0)) %>% 
+  ggplot(aes(x = reorder_within(value, indicator, variable),
+             y = percent, fill = satisfaction)) +
+  geom_col(position = "dodge") + 
+  xlab("Barplot matrix for categorical variables") +
+  coord_flip() +
+  scale_x_reordered() +
+  facet_wrap(~ variable, scales = "free") + theme_bw()
+
+# Density plot matrix
+theme1 <- transparentTheme(trans = .5)
+trellis.par.set(theme1)
+
+plt_feature <- 
+  featurePlot(x = x_train[ , c(-1, -2, -4, -5, -6)],
+              y = as.factor(y_train),
+              plot = "density",
+              scales = list(x = list(relation = "free"),
+                            y = list(relation = "free")),
+              pch = "|", auto.key = list(columns = 2))
+update(plt_feature, main = "Density Plot Matrix")
+```
