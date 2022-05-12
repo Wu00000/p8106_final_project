@@ -93,7 +93,7 @@ corrplot(cor(x_train),
          tl.cex = 0.5)
 ```
 
-```{r}
+```{r, fig.width=10, fig.height=6}
 # Barplot matrix for categorical variables
 train %>% 
   select(1:2, 4:5, 23) %>% 
@@ -116,17 +116,4 @@ train %>%
   coord_flip() +
   scale_x_reordered() +
   facet_wrap(~ variable, scales = "free") + theme_bw()
-
-# Density plot matrix
-theme1 <- transparentTheme(trans = .5)
-trellis.par.set(theme1)
-
-plt_feature <- 
-  featurePlot(x = x_train[ , c(-1, -2, -4, -5, -6)],
-              y = as.factor(y_train),
-              plot = "density",
-              scales = list(x = list(relation = "free"),
-                            y = list(relation = "free")),
-              pch = "|", auto.key = list(columns = 2))
-update(plt_feature, main = "Density Plot Matrix")
 ```
