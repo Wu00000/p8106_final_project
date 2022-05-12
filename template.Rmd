@@ -365,7 +365,10 @@ pdp2.rf <- model.rf %>%
   partial(pred.var = c("inflight_entertainment", "online_boarding"), chull = TRUE) %>% 
   autoplot(train = train) + theme_bw()
 
-grid.arrange(pdp1.rf, pdp2.rf, nrow = 1)
+p <- grid.arrange(pdp1.rf, pdp2.rf, nrow = 1)
+
+# ggsave("Plots/pdp.png", p,
+#        width = 10, height = 5)
 ```
 
 ```{r}
@@ -377,6 +380,8 @@ ice.rf <- model.rf %>%
            center = TRUE) + theme_bw()
 
 ice.rf
+
+# ggsave("Plots/ice.png", ice.rf)
 ```
 
 ```{r}
