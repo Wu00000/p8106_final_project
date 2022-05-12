@@ -102,15 +102,12 @@ train %>%
                values_to = "value") %>% 
   group_by(variable, value, satisfaction) %>% 
   summarize(num = n()) %>% 
-  ungroup() %>% 
-  group_by(variable, satisfaction) %>% 
-  mutate(percent = num / sum(num),
-         indicator = case_when(value == "Eco" ~ 3,
+  mutate(indicator = case_when(value == "Eco" ~ 3,
                                value == "Eco Plus" ~ 2,
                                value == "Business" ~ 1,
                                TRUE ~ 0)) %>% 
   ggplot(aes(x = reorder_within(value, indicator, variable),
-             y = percent, fill = satisfaction)) +
+             y = num, fill = satisfaction)) +
   geom_col(position = "dodge") + 
   xlab("Barplot matrix for categorical variables") +
   coord_flip() +
