@@ -178,6 +178,9 @@ pred.miserror_mars
 
 confusionMatrix(data = as.factor(pred_mars),
                 reference = as.factor(y_test))
+
+# check
+coef(model.mars$finalModel)
 ```
 
 
@@ -200,6 +203,11 @@ pred.miserror_lda
 
 confusionMatrix(data = as.factor(pred_lda),
                 reference = as.factor(y_test))
+
+# check
+library(MASS)
+lda.fit <- lda(satisfaction ~., data = train)
+plot(lda.fit)
 ```
 
 ## Classification Tree
@@ -354,37 +362,36 @@ barplot(sort(ranger::importance(rf2.final.per), decreasing = FALSE),
 ```{r}
 pdp1.rf <- model.rf %>% 
   partial(pred.var = c("inflight_wifi_service")) %>% 
-  autoplot(train = train, rug = TRUE)
+  autoplot(train = train) + theme_bw()
 
 pdp2.rf <- model.rf %>% 
-  partial(pred.var = c("inflight_wifi_service", "age"), chull = TRUE) %>% 
-  autoplot(train = train, rug = TRUE)
+  partial(pred.var = c("inflight_entertainment", "online_boarding"), chull = TRUE) %>% 
+  autoplot(train = train) + theme_bw()
 
 grid.arrange(pdp1.rf, pdp2.rf, nrow = 1)
 ```
 
 ```{r}
 ice.rf <- model.rf %>% 
-  partial(pred.var = "inflight_wifi_service",
+  partial(pred.var = "cleanliness",
            grid.resolution = 100,
            ice = TRUE) %>% 
   autoplot(train = dat, alpha = .1,
-           center = TRUE)
+           center = TRUE) + theme_bw()
 
 ice.rf
 ```
 
 ```{r}
-##lime
-#explain.rf <- lime(data.frame(x_train), model.rf)
+## lime
+# explain.rf <- lime(data.frame(x_train), model.rf)
 
-#new_obs = x_train[1:10,]
-#explana.obs = explain(data.frame(new_obs),
-#                      explain.rf,
-#                      n_features = 10)
-
-#plot_features(explana.obs)
+# new_obs = x_test[1:10,]
+# explana.obs = explain(new_obs,
+#                       explain.rf,
+#                       n_features = 5)
+# 
+# plot_features(explana.obs)
 ```
-
 
 
